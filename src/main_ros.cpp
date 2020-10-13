@@ -18,16 +18,19 @@ int main(int argc, char **argv)
 	ros::NodeHandle nh;
 	DepthSubscriber* depthsub;
 	RGBSubscriber* rgbsub;
-	// GPUTexture gtex(320, 240, GL_RGBA, GL_RGB, GL_UNSIGNED_BYTE, true, true);
+
+	pangolin::CreateWindowAndBind("Main", 320, 240, pangolin::Params({{"scheme", "headless"}}));
+  	std::map<std::string, GPUTexture*> textures;
+  	textures[GPUTexture::RGB] = new GPUTexture(320, 240, GL_RGBA, GL_RGB, GL_UNSIGNED_BYTE, true, true);
+
 	RGBDOdometry odom(320,240,277,277,160,120);
+
 	depthsub  = new DepthSubscriber("/X1/front/optical/depth", nh);
 	rgbsub = new RGBSubscriber("/X1/front/image_raw", nh);
-
 
 	cv::Mat img;
 	GSLAM::CameraPinhole cam(320,240,277,277,160,120);
 	std::vector<DeviceArray2D<unsigned char>> a; 
-	// std::cout<<" cx :" <<cam.cx<<" cy :" <<cam.cy<<" fx :" <<cam.fx<<" fy :" <<cam.fy<<" fx_inv :" <<cam.fx_inv<<" fy_inv :" <<cam.fy_inv;
 
 	cv::Mat s_img;
 	while (ros::ok())
@@ -40,45 +43,10 @@ int main(int argc, char **argv)
 			ros::spinOnce();
 			continue;
 		}
-		
-		unsigned char *camData = new unsigned char[img.total()*4];
-		unsigned char *h_img = new unsigned char[img.total()*4];
-		cv::Mat continuousRGBA(img.size(), CV_8UC4, camData);
-		cv::Mat s_img(img.size(), CV_8UC4, h_img);
-		// cv::cvtColor(img, continuousRGBA, CV_BGR2RGBA, 4);
-		img.convertTo(continuousRGBA, CV_8UC4);
-		
-		unsigned char *input, *ouput;
-		input = (unsigned char *)continuousRGBA.data;
-		ouput = (unsigned char *)s_img.data;
-
-		int width = img.cols;
-		int height = img.rows;
-		int nchannels = 4;
-
-		int widthstep = (width*sizeof(unsigned char)*nchannels);
-		rgb_texture_test(input, ouput, width, height, widthstep);
-		bool check;
-
-		// float *fdata = new float[img.total()*4];
-		// cv::Mat f_img_mat(img.size(), CV_32FC4, fdata);
-
-		// s_img.convertTo(f_img_mat,CV_32FC4);
-
-		check = cv::imwrite("src/MyImage.jpg", s_img);
-		   if (check == false) { 
-		       std::cout << "Mission - Saving the image, FAILED" << std::endl; 
-
-		       // wait for any key to be pressed 
-		       return -1; 
-		   } 
-	 	std::cout << "Successfully saved the image. " << std::endl; 
-		// // odom.initFirstRGB(ca);
-
-
-		delete(camData);
-		delete(h_img);
-
+		textures[GPUTexture::RGB]->texture->Upload(img.data, GL_RGB, GL_UNSIGNED_BYTE);
+		textures[GPUTexture::RGB]->cudaMap();
+  		cudaArray* textPtr = textures[GPUTexture::RGB]->getCudaArray();
+  		
 		ros::spinOnce();
 
 	}

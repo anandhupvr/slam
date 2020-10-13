@@ -17,6 +17,9 @@ find_package(CUDA REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 include_directories(${CUDA_INCLUDE_DIRS})
 
+#remove
+set(Pangolin_DIR "/home/developer/co-fusion/deps/Pangolin/build")
+find_package(Pangolin 0.1 REQUIRED)
 
 
 # Warnings / Errors
@@ -42,6 +45,9 @@ link_directories(${Boost_LIBRARY_DIRS})
 find_package(PkgConfig)
 pkg_search_module(Eigen3 REQUIRED eigen3)
 include_directories(${Eigen3_INCLUDE_DIRS})
+#remove
+include_directories(${Pangolin_INCLUDE_DIRS})
+
 
 # project-wide paths
 include_directories(${PROJECT_SOURCE_DIR})
@@ -79,6 +85,8 @@ target_include_directories(${PROJECT_NAME} PUBLIC
     ${CUDA_INCLUDE_DIRS}
     ${OpenCV_INCLUDE_DIRS}
     ${BOOST_INCLUDE_DIRS}
+    ${Pangolin_INCLUDE_DIRS}
+
 )
 
 target_link_libraries(${PROJECT_NAME}
@@ -87,6 +95,8 @@ target_link_libraries(${PROJECT_NAME}
 	  ${catkin_LIBRARIES}
     ${CUDA_LIBRARIES}
     ${OpenCV_LIBRARIES}
+    ${Pangolin_LIBRARIES}
+
     boost_filesystem
     boost_system
     pthread
