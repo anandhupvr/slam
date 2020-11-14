@@ -750,3 +750,45 @@ void projectToPointCloud(const DeviceArray2D<float> & depth,
     cudaCheckError();
     cudaSafeCall (cudaDeviceSynchronize ());
 }
+
+void rgb_texture_test(cv::Mat img,  cudaArray *cuArray, DeviceArray2D<unsigned char>& dst)
+{
+    int rows=img.rows;
+    int cols=img.cols;
+    int channels=img.channels();
+    int width=cols,height=rows,size=rows*cols*channels;
+
+    cudaChannelFormatDesc channelDesc=cudaCreateChannelDesc<uchar4>();
+    cudaMallocArray(&cuArray,&channelDesc,width,height);
+    cudaMemcpyToArray(cuArray,0,0,img.data,size,cudaMemcpyHostToDevice);
+    // tex.addressMode[0]= cudaAddressModeWrap; 
+    // tex.addressMode[1]= cudaAddressModeWrap;
+    // tex.filterMode = cudaFilterModeLinear;  
+    // tex.normalized = false;          //No normalization
+    // imageBGRToIntensity(cuArray, dst);
+
+    // cudaBindTextureToArray(tex,cuArray,channelDesc);
+
+    // cv::Mat out=cv::Mat::zeros(height, width, CV_8UC4);
+    // char *dev_out=NULL;
+    // cudaMalloc((void**)&dev_out, size);
+
+    // dim3 dimBlock(16, 16);
+    // dim3 dimGrid((width + dimBlock.x - 1) / dimBlock.x, (height + dimBlock.y - 1) / dimBlock.y);
+
+    // test <<<dimGrid,dimBlock,0>>>(dev_out,width,height,channels);
+
+    // cudaMemcpy(out.data,dev_out,size,cudaMemcpyDeviceToHost);
+
+    // cv::imwrite("src/MyImage.jpg", out);
+    // cv::imshow("orignal",img);
+    // cv::imshow("smooth_image",out);
+    // cv::waitKey(0);
+    // printf("saving\n");
+    // cudaFree(dev_out);
+    
+    // cudaFreeArray(cuArray);
+    // cudaUnbindTexture(tex);
+
+
+}
