@@ -28,13 +28,13 @@ int main(int argc, char const *argv[])
 			.SetBounds(0.0, 1.0, 0.2, 1.0, -1024.0f/768.0f)
 			.SetHandler(new pangolin::Handler3D(s_cam));
 
-	pangolin::View& rgb_image = pangolin::Display("rgb")
-	  .SetBounds(0, 0.2, 0.2, 0.4, 1024.0f/768.0f)
-	  .SetLock(pangolin::LockLeft, pangolin::LockBottom);
+	// pangolin::View& rgb_image = pangolin::Display("rgb")
+	//   .SetBounds(0, 0.2, 0.2, 0.4, 1024.0f/768.0f)
+	//   .SetLock(pangolin::LockLeft, pangolin::LockBottom);
 
 
 
-	pangolin::GlTexture texture;
+	pangolin::GlTexture* texture;
 	const GLenum internalFormat = GL_RGB;
 	const GLenum format = GL_BGR;
 	const GLenum dataType = GL_UNSIGNED_BYTE;
@@ -50,17 +50,21 @@ int main(int argc, char const *argv[])
 	int width = img.cols;
 	int height = img.rows;
 
-
-	texture = pangolin::GlTexture(width, height, internalFormat, draw, 0, format, dataType);
+	pangolin::GlFramebuffer frameBuffer;
+	texture = new pangolin::GlTexture(width, height, internalFormat, draw, 0, format, dataType);
 
 	while(!pangolin::ShouldQuit())
 	{	
 
-		cout << texture.tid << endl;
-		texture.Upload(img.data,  GL_BGR, GL_UNSIGNED_BYTE);
-		rgb_image.Activate();
+		cout << texture->tid << endl;
+		texture->Upload(img.data,  GL_BGR, GL_UNSIGNED_BYTE);
+
+
+
+
+		d_cam.Activate();
 		glColor3f(1.0,1.0,1.0);
-		texture.RenderToViewportFlipY();
+		texture->RenderToViewportFlipY();
 		pangolin::FinishFrame();
 	}
 
