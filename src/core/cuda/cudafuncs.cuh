@@ -57,9 +57,15 @@
 #else
 #define MAX_THREADS 1024
 #endif
+#include <cuda_runtime_api.h>
 
 #include "containers/device_array.hpp"
 #include "types.cuh"
+#include <opencv2/core/core.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include "opencv2/opencv.hpp"
+
 
 void icpStep(const mat33& Rcurr,
              const float3& tcurr,
@@ -188,5 +194,7 @@ void pyrDownUcharGauss(const DeviceArray2D<unsigned char>& src,
 void computeDerivativeImages(DeviceArray2D<unsigned char>& src,
                              DeviceArray2D<short>& dx,
                              DeviceArray2D<short>& dy);
+
+ void rgb_texture_test(cv::Mat img,  cudaArray *cuArray, DeviceArray2D<unsigned char>& dst);
 
 #endif /* CUDA_CUDAFUNCS_CUH_ */

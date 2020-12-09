@@ -35,7 +35,6 @@ void unproject(cv::Mat img, GSLAM::CameraPinhole cam)
 	size_t totalpixels = rows*cols;
 	const dim3 dimGrid((int)ceil((cols)/16), (int)ceil((rows)/16));
 	const dim3 dimBlock(16, 16);
-	std::cout<<"t";
 	// *input_image = (uchar4 *)img.ptr<uchar4 *>(0);
 	// cudaMalloc(ddepth, sizeof(uchar4) * totalpixels * CHANNELS);
 	// cudaMemcpy(*ddepth, *input_image, sizeof(uchar4) * totalpixels * CHANNELS, cudaMemcpyHostToDevice);
@@ -54,39 +53,70 @@ void unproject(cv::Mat img, GSLAM::CameraPinhole cam)
       
 }
 
-texture<uchar4,cudaTextureType2D,cudaReadModeNormalizedFloat> tex;
+// texture<uchar4,cudaTextureType2D,cudaReadModeNormalizedFloat> tex;
 
 
 
-__global__
-void test(char *img,int width,int heigth,int channels)
+// __global__
+// void test(char *img,int width,int heigth,int channels)
+// {
+
+//     unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
+//     unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+
+//     float4 pixel = tex2D(tex, x, y);
+
+// 	img[(y*width+x)*channels+0] = pixel.x  * 255;
+// 	img[(y*width+x)*channels+1] = pixel.y  * 255;
+// 	img[(y*width+x)*channels+2] = pixel.z  * 255;
+// 	img[(y*width+x)*channels+3] = 0;
+
+
+
+// }
+
+texture<uchar4, 2, cudaReadModeElementType> inTex;
+
+__global__ void bgr2IntensityKernel(PtrStepSz<unsigned char> dst)
 {
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
 
-    unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
-    unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
+    if (x >= dst.cols || y >= dst.rows)
+        return;
 
+    uchar4 src = tex2D(inTex, x, y);
 
-    float4 pixel = tex2D(tex, x, y);
+    int value = (float)src.x * 0.114f + (float)src.y * 0.299f + (float)src.z * 0.587f;
 
-	img[(y*width+x)*channels+0] = pixel.x  * 255;
-	img[(y*width+x)*channels+1] = pixel.y  * 255;
-	img[(y*width+x)*channels+2] = pixel.z  * 255;
-	img[(y*width+x)*channels+3] = 0;
+    printf("%d\n", value);
 
-
-
+    dst.ptr (y)[x] = value;
 }
-void rgb_texture_test(cv::Mat img)
-{
-	cv::resize(img, img, cv::Size(512, 512));
 
+void imageBGRToIntensity(cudaArray * cuArr, DeviceArray2D<unsigned char> & dst)
+{
+    dim3 block (32, 8);
+    dim3 grid (getGridDim (dst.cols (), block.x), getGridDim (dst.rows (), block.y));
+
+    cudaSafeCall(cudaBindTextureToArray(inTex, cuArr));
+
+    bgr2IntensityKernel<<<grid, block>>>(dst);
+
+    cudaCheckError();
+
+    cudaSafeCall(cudaUnbindTexture(inTex));
+}
+
+void rgb_texture_test(cv::Mat img,	cudaArray *cuArray, DeviceArray2D<unsigned char>& dst)
+{
 	int rows=img.rows;
 	int cols=img.cols;
 	int channels=img.channels();
 	int width=cols,height=rows,size=rows*cols*channels;
 
 	cudaChannelFormatDesc channelDesc=cudaCreateChannelDesc<uchar4>();
-	cudaArray *cuArray;
 	cudaMallocArray(&cuArray,&channelDesc,width,height);
 	cudaMemcpyToArray(cuArray,0,0,img.data,size,cudaMemcpyHostToDevice);
 
@@ -95,32 +125,41 @@ void rgb_texture_test(cv::Mat img)
 	tex.filterMode = cudaFilterModeLinear;  
 	tex.normalized =false;          //No normalization
 
-	cudaBindTextureToArray(tex,cuArray,channelDesc);
+
+	imageBGRToIntensity(cuArray, dst);
+
+	// cudaBindTextureToArray(tex,cuArray,channelDesc);
 
 
-	cv::Mat out=cv::Mat::zeros(width, height, CV_8UC4);
-	char *dev_out=NULL;
-	cudaMalloc((void**)&dev_out, size);
+	// cv::Mat out=cv::Mat::zeros(height, width, CV_8UC4);
+	// char *dev_out=NULL;
+	// cudaMalloc((void**)&dev_out, size);
 
-	dim3 dimBlock(16, 16);
-	dim3 dimGrid((width + dimBlock.x - 1) / dimBlock.x, (height + dimBlock.y - 1) / dimBlock.y);
+	// dim3 dimBlock(16, 16);
+	// dim3 dimGrid((width + dimBlock.x - 1) / dimBlock.x, (height + dimBlock.y - 1) / dimBlock.y);
 
-	test <<<dimGrid,dimBlock,0>>>(dev_out,width,height,channels);
+	// test <<<dimGrid,dimBlock,0>>>(dev_out,width,height,channels);
 
 
 
-    cudaMemcpy(out.data,dev_out,size,cudaMemcpyDeviceToHost);
+ //    cudaMemcpy(out.data,dev_out,size,cudaMemcpyDeviceToHost);
+
+
 
 
     // cv::imwrite("src/MyImage.jpg", out);
-    cv::imshow("orignal",img);
-    cv::imshow("smooth_image",out);
-    cv::waitKey(0);
-    printf("saving\n");
-    cudaFree(dev_out);
-    cudaFree(cuArray);
+    // cv::imshow("orignal",img);
+    // cv::imshow("smooth_image",out);
+    // cv::waitKey(0);
+    // printf("saving\n");
+    // cudaFree(dev_out);
+    cudaFreeArray(cuArray);
     cudaUnbindTexture(tex);
 
 
 }
 
+// void _cudaFree(cudaArray* cuArray)
+// {
+//     cudaSafeCall(cudaFreeArray(cuArray));
+// }
