@@ -6,6 +6,8 @@
 #include "cuda/cudafuncs.cuh"
 #include "cuda/containers/device_array.hpp"
 #include "RGBDOdometry.h"
+#include <Fern.h>
+#include "Resolution.h"
 
 using namespace std;
 
@@ -19,6 +21,10 @@ int main(int argc, char  *argv[])
 
 	Eigen::Vector3f transObject = pose.topRightCorner(3, 1);
 	Eigen::Matrix<float, 3, 3, Eigen::RowMajor> rotObject = pose.topLeftCorner(3, 3);
+
+	Resolution::setResolution(320, 240);
+	Ferns ferns(500, 3*1000, 115);
+	// ferns(500, 3*1000, 115);
 
 	ros::init(argc, argv, "test_node");
 	ros::NodeHandle nh;
@@ -54,8 +60,8 @@ int main(int argc, char  *argv[])
 
 	depth.create(height, width);
 
-	depthsub  = new DepthSubscriber("/X1/front/depth", nh);
-	rgbsub = new RGBSubscriber("/X1/front/image_raw", nh);
+	depthsub  = new DepthSubscriber("/ROBOTIKA_X1/front/depth", nh);
+	rgbsub = new RGBSubscriber("/ROBOTIKA_X1/front/image_raw", nh);
 
 	int i = 0;
 	while (ros::ok())
@@ -104,8 +110,11 @@ int main(int argc, char  *argv[])
 		createNMap(vmap, nmap);
 		std::swap(rgb, rgb_prev);
 		splatDepthPredict(intr, height, width, tinv.data(), vmap, vmap_splat_prev, nmap, nmap_splat_prev);
-		std::cout<<"i :"<< i<< "\ntrans :"<<transObject<<std::endl<<"rot :"<<rotObject<<std::endl;
+		// std::cout<<"i :"<< i<< "\ntrans :"<<transObject<<std::endl<<"rot :"<<rotObject<<std::endl;
 		// std::cout<<"i :"<< i<< "\npose :"<<pose<<std::endl;
+
+		ferns.addFrame(rgb_prev, pose, 1, 1);
+
 		ros::spinOnce();
 		i++;
 		

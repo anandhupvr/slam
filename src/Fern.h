@@ -1,10 +1,15 @@
 #ifndef FERNS_H_
 #define FERNS_H_
 
+#include <iostream>
 #include <random>
 #include <Eigen/Core>
 #include <vector>
 #include <limits>
+#include "img.h"
+#include "cuda/containers/device_array.hpp"
+#include "Resolution.h"
+#include "cuda/cudafuncs.cuh"
 
 
 
@@ -13,7 +18,7 @@ public:
 	Ferns( int n, int maxDepth, const  float photoThresh);
 	virtual ~Ferns();
 
-	bool addFrame(GPUTexture* imageTexture, const Eigen::Matrix4f& pose, int srcTime,
+	bool addFrame(DeviceArray<float>& imageTexture, const Eigen::Matrix4f& pose, int srcTime,
 					const float threshold);
 
 	class Fern {

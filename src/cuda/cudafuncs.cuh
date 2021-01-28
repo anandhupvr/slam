@@ -141,6 +141,10 @@ void computeBilateralFilter(const DeviceArray2D<float>& depth,
                 DeviceArray2D<float> & filtered,
                 const float depthCutoff);
 
+void resizeRGB(const int rows,
+                const int cols, float* src,
+                float*  dst);
+
 void tranformMaps(const DeviceArray2D<float>& vmap_src,
                   const DeviceArray2D<float>& nmap_src,
                   const mat33& Rmat,

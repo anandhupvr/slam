@@ -8,6 +8,13 @@ set(Pangolin_DIR "/home/developer/co-fusion/deps/Pangolin/build")
 #set(OpenCV_DIR "/home/developer/co-fusion/deps/opencv-3.1.0/build")
 #set(cv_bridge_DIR "/home/developer/packages/vision_opencv/cv_bridge/install/share/cv_bridge/cmake")
 
+set(shader_dir "shaders/")
+include_directories(${shader_dir})
+
+
+set(utils_dir "utils/")
+include_directories(${utils_dir})
+
 find_package(catkin REQUIRED COMPONENTS roscpp rospy std_msgs genmsg cv_bridge image_transport)  
 include_directories(${catkin_INCLUDE_DIRS}) 
 catkin_package()

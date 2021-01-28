@@ -402,8 +402,29 @@ void copyMaps(const DeviceArray<float>& vmap_src,
     cudaSafeCall(cudaGetLastError());
 }
 
+__global__ void resize_rgb(int rows, int cols, const float * dst, const float * src)
+{
+    int x = threadIdx.x + blockIdx.x * blockDim.x;
+    int y = threadIdx.y + blockIdx.x * blockDim.y;
 
+    if (x < cols && y < rows)
+    {
+        float3 dst = make_float3 (__int_as_float(0x7fffffff), __int_as_float(0x7fffffff), __int_as_float(0x7fffffff));
 
+        dst.x = src[y * cols * 4 + (x * 4) + 0];
+        dst.y = src[rows * cols * 4 + y * cols * 4 + (x * 4) + 1];
+        dst.z = src[2 * rows * cols * 4 + y * cols * 4 + (x * 4) + 2];
+
+    }
+}
+
+void resizeRGB(const int rows, const int cols, const DeviceArray<float>& src, const DeviceArray<float>& dst){
+    dim3 block(32, 8);
+    dim3 grid(1, 1, 1);
+
+    resize_rgb<<<grid, block>>>(rows, cols, src, dst);
+    cudaSafeCall(cudaGetLastError());
+}
 __global__ void copyMapsKernel2D_2_2D(int rows, int cols, PtrStepSz<float> vmap_src, PtrStep<float> nmap_src,
                                PtrStepSz<float> vmap_dst, PtrStep<float> nmap_dst)
 {
