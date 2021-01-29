@@ -1,5 +1,6 @@
 #ifndef FERNS_H_
 #define FERNS_H_
+#include <cuda_runtime_api.h>
 
 #include <iostream>
 #include <random>
@@ -7,9 +8,9 @@
 #include <vector>
 #include <limits>
 #include "img.h"
+#include "cuda/cudafuncs.cuh"
 #include "cuda/containers/device_array.hpp"
 #include "Resolution.h"
-#include "cuda/cudafuncs.cuh"
 
 
 

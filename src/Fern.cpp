@@ -23,14 +23,20 @@ Ferns::~Ferns() {
 bool Ferns::addFrame(DeviceArray<float>& imageTexture, const Eigen::Matrix4f& pose, int srcTime,
 				const float threshold){
 
-	std::cout << imageTexture.size() << " device array size " << std::endl;
+	// std::cout << imageTexture.size() << " device array size " << std::endl;
 	Img<Eigen::Matrix<unsigned char, 3, 1>> img(height, width);
 
 	DeviceArray<float> dst;
 	dst.create(height*width*3);
-	// resizeRGB(height, width, imageTexture, dst);
-	std::cout << img.cols << " = cols,  " <<  img.rows << "  = rows " << std::endl;
-	std::cout << dst.size() << " resized size " << std::endl;
+  float dwd(height*width*3);
+  // std::cout << dst[0] << " --- before " << std::endl;
+	resizeRGB(height, width, imageTexture, dst);
+
+  dst.download(&dwd);
+  std::cout << dwd << " --- after " << std::endl;
+
+	// std::cout << img.cols << " = cols,  " <<  img.rows << "  = rows " << std::endl;
+	// std::cout << dst.size() << " resized size " << std::endl;
 	// Frame* frame = new Frame(num, frames.size(), pose, srcTime, width * height,
 	// 							(unsigned char*)img.data);
 

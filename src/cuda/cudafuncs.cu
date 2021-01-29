@@ -418,7 +418,7 @@ __global__ void resize_rgb(int rows, int cols, const float * dst, const float * 
     }
 }
 
-void resizeRGB(const int rows, const int cols, const DeviceArray<float>& src, const DeviceArray<float>& dst){
+void resizeRGB(const int rows, const int cols, float* src, float* dst){
     dim3 block(32, 8);
     dim3 grid(1, 1, 1);
 
