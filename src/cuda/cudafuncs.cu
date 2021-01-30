@@ -402,27 +402,127 @@ void copyMaps(const DeviceArray<float>& vmap_src,
     cudaSafeCall(cudaGetLastError());
 }
 
-__global__ void resize_rgb(int rows, int cols, const float * dst, const float * src)
+__global__ void copy(int height, int width, float * dst, const float * src)
 {
+
     int x = threadIdx.x + blockIdx.x * blockDim.x;
-    int y = threadIdx.y + blockIdx.x * blockDim.y;
+    int y = threadIdx.y + blockIdx.y * blockDim.y;
 
-    if (x < cols && y < rows)
+    if (x < width && y < height)
     {
-        float3 dst = make_float3 (__int_as_float(0x7fffffff), __int_as_float(0x7fffffff), __int_as_float(0x7fffffff));
 
-        dst.x = src[y * cols * 4 + (x * 4) + 0];
-        dst.y = src[rows * cols * 4 + y * cols * 4 + (x * 4) + 1];
-        dst.z = src[2 * rows * cols * 4 + y * cols * 4 + (x * 4) + 2];
+
+        dst[y * width * 4 + (x * 4) + 0] = src[y * width * 4 + (x * 4) + 0];
+        dst[y * width * 4 + (x * 4) + 0] = src[y * width * 4 + (x * 4) + 1];
+        dst[y * width * 4 + (x * 4) + 0] = src[y * width * 4 + (x * 4) + 2];
 
     }
+
 }
 
-void resizeRGB(const int rows, const int cols, float* src, float* dst){
+void Copy(const int height, const int width, float* src, float* dst){
     dim3 block(32, 8);
     dim3 grid(1, 1, 1);
 
-    resize_rgb<<<grid, block>>>(rows, cols, src, dst);
+
+    copy<<<grid, block>>>(height, width, src, dst);
+    cudaSafeCall(cudaGetLastError());
+}
+__global__ void resize(int height, int width, float * dst, const float * src, int factor)
+{
+
+    int x = threadIdx.x + blockIdx.x * blockDim.x;
+    int y = threadIdx.y + blockIdx.y * blockDim.y;
+
+    if (x < width && y < height)
+    {
+
+
+        dst[y * width * 4 + (x * 4) + 0] = src[y * width * 4 + (x * 4) + 0];
+        dst[y * width * 4 + (x * 4) + 0] = src[y * width * 4 + (x * 4) + 1];
+        dst[y * width * 4 + (x * 4) + 0] = src[y * width * 4 + (x * 4) + 2];
+
+    }
+
+}
+
+void Resize(const int height, const int width, float* src, float* dst, int factor){
+    dim3 block(32, 8);
+    dim3 grid(1, 1, 1);
+
+
+    resize<<<grid, block>>>(height, width, src, dst, factor);
+    cudaSafeCall(cudaGetLastError());
+}
+
+__global__ void resize_rgb(int height, int width, float * dst, const float * src, int factor)
+{
+    __shared__ int32_t tile[1024];
+    const float x_ratio = float(factor);
+    const float y_ratio = float(factor);
+
+
+    unsigned int threadId = blockIdx.x * 1024*1 + threadIdx.x*1;
+    unsigned int shift = 0;
+
+    while((threadId < width*height && shift < 1))
+    {
+        const int32_t i = threadId / width;
+        const int32_t j = threadId - (i * width);
+
+        const int32_t x = (int)(x_ratio * j);
+        const int32_t y = (int)(y_ratio * i);
+        const float x_diff = (x_ratio * j) - x;
+        const float y_diff = (y_ratio * i) - y;
+        const int32_t index = (y * width*8 + x);
+        const int32_t a = src[index];
+        const int32_t b = src[index + 1];
+        const int32_t c = src[index + width*factor];
+        const int32_t d = src[index + width*factor + 1];
+
+        const float blue = (a & 0xff)*(1 - x_diff)*(1 - y_diff) + (b & 0xff)*(x_diff)*(1 - y_diff) +
+            (c & 0xff)*(y_diff)*(1 - x_diff) + (d & 0xff)*(x_diff*y_diff);
+ 
+        // green element
+        // Yg = Ag(1-w)(1-h) + Bg(w)(1-h) + Cg(h)(1-w) + Dg(wh)
+        const float green = ((a >> 8) & 0xff)*(1 - x_diff)*(1 - y_diff) + ((b >> 8) & 0xff)*(x_diff)*(1 - y_diff) +
+            ((c >> 8) & 0xff)*(y_diff)*(1 - x_diff) + ((d >> 8) & 0xff)*(x_diff*y_diff);
+ 
+        // red element
+        // Yr = Ar(1-w)(1-h) + Br(w)(1-h) + Cr(h)(1-w) + Dr(wh)
+        const float red = ((a >> 16) & 0xff)*(1 - x_diff)*(1 - y_diff) + ((b >> 16) & 0xff)*(x_diff)*(1 - y_diff) +
+            ((c >> 16) & 0xff)*(y_diff)*(1 - x_diff) + ((d >> 16) & 0xff)*(x_diff*y_diff);
+
+
+
+        tile[threadIdx.x] =
+            0xff000000 |
+            ((((int32_t)red) << 16) & 0xff0000) |
+            ((((int32_t)green) << 8) & 0xff00) |
+            ((int32_t)blue);
+ 
+        threadId++;
+        //threadId+= WARP_SIZE;
+        shift++;
+
+
+    }
+
+    __syncthreads();
+    threadId = blockIdx.x * 1024*1 + threadIdx.x*1;
+    dst[threadId] = tile[threadIdx.x];
+
+
+}
+
+void resizeRGB(const int height, const int width, float* src, float* dst, int factor){
+    // dim3 block(32, 8);
+    // dim3 grid(1, 1, 1);
+
+    dim3 threads = dim3(1024, 1,1);
+    dim3 blocks = dim3(width*height/ 1024, 1,1);
+
+    resize_rgb<<<blocks, threads>>>(height, width, src, dst, factor);
     cudaSafeCall(cudaGetLastError());
 }
 __global__ void copyMapsKernel2D_2_2D(int rows, int cols, PtrStepSz<float> vmap_src, PtrStep<float> nmap_src,
