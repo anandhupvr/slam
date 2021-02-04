@@ -428,7 +428,8 @@ void Copy(const int height, const int width, float* src, float* dst){
     copy<<<grid, block>>>(height, width, src, dst);
     cudaSafeCall(cudaGetLastError());
 }
-__global__ void resize(int height, int width, float * dst, const float * src, int factor)
+
+__global__ void resize(int height, int width, unsigned char * dst, const float * src, int factor)
 {
 
     int x = threadIdx.x + blockIdx.x * blockDim.x;
@@ -438,20 +439,20 @@ __global__ void resize(int height, int width, float * dst, const float * src, in
     {
 
 
-        dst[y * width * 4 + (x * 4) + 0] = src[y * width * 4 + (x * 4) + 0];
-        dst[y * width * 4 + (x * 4) + 0] = src[y * width * 4 + (x * 4) + 1];
-        dst[y * width * 4 + (x * 4) + 0] = src[y * width * 4 + (x * 4) + 2];
+        dst[y * width  + (x ) + 0] = (unsigned char)src[y * width * 4 + (x * 4) + 0];
+        dst[y * width  + (x ) + 0] = (unsigned char)src[y * width * 4 + (x * 4) + 1];
+        dst[y * width  + (x ) + 0] = (unsigned char)src[y * width * 4 + (x * 4) + 2];
 
     }
 
 }
 
-void Resize(const int height, const int width, float* src, float* dst, int factor){
+void Resize(const int height, const int width, float* src, unsigned char* dst, int factor){
     dim3 block(32, 8);
     dim3 grid(1, 1, 1);
 
 
-    resize<<<grid, block>>>(height, width, src, dst, factor);
+    resize<<<grid, block>>>(height, width, dst, src, factor);
     cudaSafeCall(cudaGetLastError());
 }
 
@@ -761,6 +762,61 @@ __global__ void resizeMapKernel(int drows, int dcols, int srows, const PtrStep<f
     }
 }
 
+
+template<bool normalize>
+__global__ void resizeMapKernelF(int drows, int dcols, int srows, const PtrStep<float> input, PtrStep<unsigned char> output)
+{
+    int x = threadIdx.x + blockIdx.x * blockDim.x;
+    int y = threadIdx.y + blockIdx.y * blockDim.y;
+
+    if (x >= dcols || y >= drows)
+        return;
+
+    const float qnan = __int_as_float(0x7fffffff);
+
+    int xs = x * 2;
+    int ys = y * 2;
+
+    float x00 = input.ptr (ys + 0)[xs + 0];
+    float x01 = input.ptr (ys + 0)[xs + 1];
+    float x10 = input.ptr (ys + 1)[xs + 0];
+    float x11 = input.ptr (ys + 1)[xs + 1];
+
+    if (isnan (x00) || isnan (x01) || isnan (x10) || isnan (x11))
+    {
+        output.ptr (y)[x] = (unsigned char)qnan;
+        return;
+    }
+    else
+    {
+        float3 n;
+
+        n.x = (x00 + x01 + x10 + x11) / 4;
+
+        float y00 = input.ptr (ys + srows + 0)[xs + 0];
+        float y01 = input.ptr (ys + srows + 0)[xs + 1];
+        float y10 = input.ptr (ys + srows + 1)[xs + 0];
+        float y11 = input.ptr (ys + srows + 1)[xs + 1];
+
+        n.y = (y00 + y01 + y10 + y11) / 4;
+
+        float z00 = input.ptr (ys + 2 * srows + 0)[xs + 0];
+        float z01 = input.ptr (ys + 2 * srows + 0)[xs + 1];
+        float z10 = input.ptr (ys + 2 * srows + 1)[xs + 0];
+        float z11 = input.ptr (ys + 2 * srows + 1)[xs + 1];
+
+        n.z = (z00 + z01 + z10 + z11) / 4;
+
+        if (normalize)
+            n = normalized (n);
+
+        output.ptr (y        )[x] = (unsigned char)n.x;
+        output.ptr (y + drows)[x] = (unsigned char)n.y;
+        output.ptr (y + 2 * drows)[x] = (unsigned char)n.z;
+    }
+}
+
+
 template<bool normalize>
 void resizeMap(const DeviceArray2D<float>& input, DeviceArray2D<float>& output)
 {
@@ -787,6 +843,28 @@ void resizeVMap(const DeviceArray2D<float>& input, DeviceArray2D<float>& output)
 void resizeNMap(const DeviceArray2D<float>& input, DeviceArray2D<float>& output)
 {
     resizeMap<true>(input, output);
+}
+
+template<bool normalize>
+void resizeMapF(const DeviceArray2D<float>& input, DeviceArray2D<unsigned char>& output)
+{
+    int in_cols = input.cols();
+    int in_rows  = input.rows()/3;
+
+    int out_cols = output.cols();
+    int out_rows = output.rows()/3;
+
+    dim3 block(32, 8);
+    dim3 grid (getGridDim (out_cols, block.x), getGridDim (out_rows, block.y));
+    resizeMapKernelF<normalize><< <grid, block>>>(out_rows, out_cols, in_rows, input, output);
+    cudaCheckError();
+    cudaSafeCall (cudaDeviceSynchronize ());    
+
+}
+
+void resizev(const DeviceArray2D<float>& input, DeviceArray2D<unsigned char>& output)
+{
+    resizeMapF<false>(input, output);
 }
 
 //FIXME Remove

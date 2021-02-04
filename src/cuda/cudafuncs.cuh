@@ -144,9 +144,13 @@ void computeBilateralFilter(const DeviceArray2D<float>& depth,
 void resizeRGB(const int rows,
                 const int cols, float* src,
                 float*  dst, int factor);
+
 void Resize(const int height, const int width,
-                float* src, float* dst,
+                float* src, unsigned char * dst,
                 int factor);
+
+void resizev(const DeviceArray2D<float>& input,
+                DeviceArray2D<unsigned char>& output);
 
 void Copy(const int height, const int width, float* src, float* dst);
 

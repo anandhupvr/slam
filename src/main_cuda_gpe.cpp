@@ -5,8 +5,7 @@
 #include <iostream>
 #include "cuda/cudafuncs.cuh"
 #include "cuda/containers/device_array.hpp"
-#include "RGBDOdometry.h"
-#include <Fern.h>
+#include <Ferns.h>
 #include "Resolution.h"
 
 using namespace std;
@@ -23,6 +22,7 @@ int main(int argc, char  *argv[])
 	Eigen::Matrix<float, 3, 3, Eigen::RowMajor> rotObject = pose.topLeftCorner(3, 3);
 
 	Resolution::setResolution(320, 240);
+	Intrinsics::setIntrinics(528, 528, 320, 240);
 	Ferns ferns(500, 3*1000, 115);
 	// ferns(500, 3*1000, 115);
 
@@ -113,7 +113,7 @@ int main(int argc, char  *argv[])
 		// std::cout<<"i :"<< i<< "\ntrans :"<<transObject<<std::endl<<"rot :"<<rotObject<<std::endl;
 		// std::cout<<"i :"<< i<< "\npose :"<<pose<<std::endl;
 
-		ferns.addFrame(rgb_prev, pose, 1, 1);
+		ferns.addFrame(rgb_prev, vmap_splat_prev, nmap_splat_prev, pose, 1, 1);
 
 		ros::spinOnce();
 		i++;
