@@ -440,8 +440,8 @@ __global__ void resize(int height, int width, unsigned char * dst, const float *
 
 
         dst[y * width  + (x ) + 0] = (unsigned char)src[y * width * 4 + (x * 4) + 0];
-        dst[y * width  + (x ) + 0] = (unsigned char)src[y * width * 4 + (x * 4) + 1];
-        dst[y * width  + (x ) + 0] = (unsigned char)src[y * width * 4 + (x * 4) + 2];
+        dst[y * width  + (x ) + 1] = (unsigned char)src[y * width * 4 + (x * 4) + 1];
+        dst[y * width  + (x ) + 2] = (unsigned char)src[y * width * 4 + (x * 4) + 2];
 
     }
 
