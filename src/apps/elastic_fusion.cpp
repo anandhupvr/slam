@@ -1,13 +1,14 @@
 #include "inputs/RawLogReader.h"
 #include <libconfig.hh>
 #include "../ui/EFGUI.h"
-#include "../odom/RGBDOdometryef.h"
+// #include "../odom/RGBDOdometryef.h"
 #include "../gl/FeedbackBuffer.h"
 #include "../gl/ComputePack.h"
 #include "../gl/FillIn.h"
 #include "../model/GlobalModel.h"
 #include "../model/IndexMap.h"
 #include "../gl/Vertex.h"
+#include "../lc/Ferns.h"
 
 using namespace libconfig;
 
@@ -95,7 +96,7 @@ int main(int argc, char const *argv[])
 	Config cfg;
 	try
 	{
-		cfg.readFile("/home/developer/slam/src/configs/ef.cfg");
+		cfg.readFile("/home/developer/work/git_push/fork/slam/src/configs/ef.cfg");
 	}
 	catch(const FileIOException &fioex)
 	{
@@ -106,6 +107,7 @@ int main(int argc, char const *argv[])
 	// ElasticFusion Params
   	float confidence, depth, icp, icpErrThresh, covThresh, photoThresh, fernThresh, depthCutoff, maxDepthProcessed;
 	int timeDelta, icpCountThresh;
+	bool closeLoops;
 	const Setting& root = cfg.getRoot();
 	root["ef"].lookupValue("confidence", confidence);
 	root["ef"].lookupValue("depth", depth);
@@ -118,6 +120,7 @@ int main(int argc, char const *argv[])
 	root["ef"].lookupValue("icpCountThresh", icpCountThresh);
 	root["ef"].lookupValue("depthCutoff", depthCutoff);
 	root["ef"].lookupValue("maxDepthProcessed", maxDepthProcessed);
+	root["ef"].lookupValue("closeLoops", closeLoops);
 
 	std::cout<<confidence<<std::endl<<depth<<std::endl<<icp<<std::endl<<icpErrThresh<<std::endl<<covThresh<<std::endl<<photoThresh<<std::endl<<fernThresh<<std::endl<<depthCutoff<<std::endl<<maxDepthProcessed;
 	//Camera Params
@@ -138,8 +141,8 @@ int main(int argc, char const *argv[])
 
 	EFGUI gui(width, height, intr.cx, intr.cy, intr.fx, intr.fy);
 	RGBDOdometryef frameToModel(width, height, intr.cx,intr.cy, intr.fx, intr.fy);
-
-
+	Ferns ferns(500, depthCutoff * 1000, photoThresh, intr, width, height);
+ 
 	//data
   	std::string logFile;
 	root["data"].lookupValue("path", logFile);
@@ -160,14 +163,14 @@ int main(int argc, char const *argv[])
     textures[GPUTexture::DEPTH_NORM] = new GPUTexture(width, height, GL_LUMINANCE, GL_LUMINANCE, GL_FLOAT, true);
 
     //createcompute
-    computePacks[ComputePack::NORM] = new ComputePack(loadProgramFromFile("empty.vert", "depth_norm.frag", "quad.geom", "/home/developer/slam/src/gl/shaders/"), textures[GPUTexture::DEPTH_NORM]->texture, width, height);
-    computePacks[ComputePack::FILTER] = new ComputePack(loadProgramFromFile("empty.vert", "depth_bilateral.frag", "quad.geom", "/home/developer/slam/src/gl/shaders/"), textures[GPUTexture::DEPTH_FILTERED]->texture, width, height);
-    computePacks[ComputePack::METRIC] = new ComputePack(loadProgramFromFile("empty.vert", "depth_metric.frag", "quad.geom", "/home/developer/slam/src/gl/shaders/"), textures[GPUTexture::DEPTH_METRIC]->texture, width, height);
-    computePacks[ComputePack::METRIC_FILTERED] = new ComputePack(loadProgramFromFile("empty.vert", "depth_metric.frag", "quad.geom", "/home/developer/slam/src/gl/shaders/"), textures[GPUTexture::DEPTH_METRIC_FILTERED]->texture, width, height);
+    computePacks[ComputePack::NORM] = new ComputePack(loadProgramFromFile("empty.vert", "depth_norm.frag", "quad.geom", "/home/developer/work/git_push/fork/slam/src/gl/shaders/"), textures[GPUTexture::DEPTH_NORM]->texture, width, height);
+    computePacks[ComputePack::FILTER] = new ComputePack(loadProgramFromFile("empty.vert", "depth_bilateral.frag", "quad.geom", "/home/developer/work/git_push/fork/slam/src/gl/shaders/"), textures[GPUTexture::DEPTH_FILTERED]->texture, width, height);
+    computePacks[ComputePack::METRIC] = new ComputePack(loadProgramFromFile("empty.vert", "depth_metric.frag", "quad.geom", "/home/developer/work/git_push/fork/slam/src/gl/shaders/"), textures[GPUTexture::DEPTH_METRIC]->texture, width, height);
+    computePacks[ComputePack::METRIC_FILTERED] = new ComputePack(loadProgramFromFile("empty.vert", "depth_metric.frag", "quad.geom", "/home/developer/work/git_push/fork/slam/src/gl/shaders/"), textures[GPUTexture::DEPTH_METRIC_FILTERED]->texture, width, height);
 
     //createfeedbackbuffers
-    feedbackBuffers[FeedbackBuffer::RAW] = new FeedbackBuffer(loadProgramGeomFromFile("vertex_feedback.vert", "vertex_feedback.geom", "/home/developer/slam/src/gl/shaders/"), width, height, intr);
-    feedbackBuffers[FeedbackBuffer::FILTERED] = new FeedbackBuffer(loadProgramGeomFromFile("vertex_feedback.vert", "vertex_feedback.geom", "/home/developer/slam/src/gl/shaders/"), width, height, intr);
+    feedbackBuffers[FeedbackBuffer::RAW] = new FeedbackBuffer(loadProgramGeomFromFile("vertex_feedback.vert", "vertex_feedback.geom", "/home/developer/work/git_push/fork/slam/src/gl/shaders/"), width, height, intr);
+    feedbackBuffers[FeedbackBuffer::FILTERED] = new FeedbackBuffer(loadProgramGeomFromFile("vertex_feedback.vert", "vertex_feedback.geom", "/home/developer/work/git_push/fork/slam/src/gl/shaders/"), width, height, intr);
 	
 
     IndexMap indexMap(width, height, intr);
@@ -238,6 +241,19 @@ int main(int argc, char const *argv[])
 	   		predict(indexMap, currPose, globalModel, maxDepthProcessed, confidence, tick, timeDelta, fillIn, textures);
 			Eigen::Matrix4f recoveryPose = currPose;
 
+			std::vector<Ferns::SurfaceConstraint> constraints;
+
+			if (closeLoops){
+
+	            recoveryPose = ferns.findFrame(constraints,
+	                                           currPose,
+	                                           &fillIn.vertexTexture,
+	                                           &fillIn.normalTexture,
+	                                           &fillIn.imageTexture,
+	                                           tick,
+	                                           false);
+			}
+
 			if (trackingOk)
 	        {
 	            indexMap.predictIndices(currPose, tick, globalModel.model(), maxDepthProcessed, timeDelta);
@@ -272,6 +288,7 @@ int main(int argc, char const *argv[])
         }
 
 	    predict(indexMap, currPose, globalModel, maxDepthProcessed, confidence, tick, timeDelta, fillIn, textures);
+	    ferns.addFrame(&fillIn.imageTexture, &fillIn.vertexTexture, &fillIn.normalTexture, currPose, tick, fernThresh);
 	    gui.render(globalModel.model(), Vertex::SIZE);
 
 		tick++;
